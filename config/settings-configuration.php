@@ -15,9 +15,9 @@ date_default_timezone_set('Asia/Manila');
 // ==============================
 define('SMTP_HOST', 'smtp.gmail.com');        // Example: smtp.gmail.com
 define('SMTP_PORT', 587);                     // Common: 587 (TLS) or 465 (SSL)
-define('SMTP_USERNAME', 'artaziessamson@gmail.com'); // Your SMTP email
-define('SMTP_PASSWORD', 'bwuh idvd lric hrzk');  // Your SMTP password or App Password
-define('MAIL_FROM_EMAIL', 'artaziessamson@gmail.com'); // Sender email
+define('SMTP_USERNAME', 'your@email.com'); // Your SMTP email
+define('SMTP_PASSWORD', 'yourapppassword');  // Your SMTP password or App Password
+define('MAIL_FROM_EMAIL', 'your@email.com'); // Sender email
 define('MAIL_FROM_NAME', PROJECT_NAME);           // Sender name (uses project name)
 
 // ==============================
