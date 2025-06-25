@@ -1,9 +1,10 @@
 <?php
-require_once __DIR__ . '/../../database/db_config.php'; // ✅ Correct filename
-require_once __DIR__ . '/../vendor/autoload.php'; // For PHPMailer
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
+
+require_once __DIR__ . '/../../database/db_config.php'; // ✅ Correct filename
+require_once __DIR__ . '/../../vendor/autoload.php'; // For PHPMailer
 
 class USER
 {
@@ -20,33 +21,43 @@ class USER
         return $this->conn->prepare($sql);
     }
 
-    public function register($fullname, $email, $password, $token)
+    public function register($fullname, $email, $password, $token = null)
     {
         try {
+            // Check if email already exists
+            $stmt = $this->conn->prepare("SELECT user_id FROM users WHERE email = :email");
+            $stmt->execute([':email' => $email]);
+            if ($stmt->rowCount() > 0) {
+                return false;
+            }
+
             $hashPassword = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $this->conn->prepare("INSERT INTO users(fullname, email, password, token, user_type, status) 
-                                          VALUES(:fullname, :email, :password, :token, 3, 0)");
+            $stmt = $this->conn->prepare("INSERT INTO users (full_name, email, password, role, status, token)
+                                      VALUES (:fullname, :email, :password, 3, 'inactive', :token)");
             $stmt->bindParam(":fullname", $fullname);
             $stmt->bindParam(":email", $email);
             $stmt->bindParam(":password", $hashPassword);
             $stmt->bindParam(":token", $token);
             return $stmt->execute();
         } catch (PDOException $e) {
+            echo "Error: " . $e->getMessage(); // Enable this temporarily for debugging
             return false;
         }
     }
 
+
     public function login($email, $password)
     {
         try {
-            $stmt = $this->conn->prepare("SELECT * FROM users WHERE email=:email");
+            $stmt = $this->conn->prepare("SELECT * FROM users WHERE email = :email");
             $stmt->bindParam(":email", $email);
             $stmt->execute();
             $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($stmt->rowCount() == 1) {
+
+            if ($userRow) {
                 if (password_verify($password, $userRow['password'])) {
-                    if ($userRow['status'] == 1) {
-                        $_SESSION['userSession'] = $userRow['id'];
+                    if ($userRow['status'] === 'active') {
+                        $_SESSION['userSession'] = $userRow['user_id']; // Corrected field
                         return true;
                     } else {
                         return "not_verified";
@@ -62,6 +73,7 @@ class USER
         }
     }
 
+
     public function isUserLoggedIn()
     {
         return isset($_SESSION['userSession']);
@@ -69,8 +81,26 @@ class USER
 
     public function logout()
     {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $_SESSION = []; // Clear session array
+
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params["path"],
+                $params["domain"],
+                $params["secure"],
+                $params["httponly"]
+            );
+        }
+
         session_destroy();
-        unset($_SESSION['userSession']);
         return true;
     }
 
@@ -105,7 +135,7 @@ class USER
             $mail->isHTML(true);
             $mail->Subject = "OTP Verification";
             $mail->Body = "Click this link to verify your account: <br><br>
-                           <a href='" . SITE_URL . "auth/otp-verify.php?email=$email&token=$token'>Verify Account</a>";
+                           <a href='" . SITE_URL . "dashboard/user/otp-verify.php?email=$email&token=$token'>Verify Account</a>";
 
             return $mail->send();
         } catch (Exception $e) {
@@ -115,10 +145,11 @@ class USER
 
     public function activateUser($email, $token)
     {
-        $stmt = $this->conn->prepare("UPDATE users SET status = 1, token = '' WHERE email = :email AND token = :token");
+        $stmt = $this->conn->prepare("UPDATE users SET status = 'active', token = '' WHERE email = :email AND token = :token");
         $stmt->execute([':email' => $email, ':token' => $token]);
         return $stmt->rowCount() > 0;
     }
+
 
     public function forgotPassword($email, $token)
     {
@@ -172,4 +203,3 @@ class USER
         return RECAPTCHA_SECRET_KEY;
     }
 }
-?>
